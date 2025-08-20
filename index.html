@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title id="pageTitle">个人主页 · 表/里双界面（上下渐变 + 平滑切换）</title>
+  <style>
+    :root {
+      /* 默认先给表形态的高级灰红 */
+      --card: #ffffff;
+      --text: #1f2937;   /* 高级灰文字 */
+      --muted: #6b7280;  /* 次要文字 */
+      --accent: #ef4444; /* 点缀红 */
+      --radius: 18px;
+      --shadow: 0 8px 30px rgba(0,0,0,0.06);
+      --t: 360ms cubic-bezier(.2,.8,.2,1);
+    }
+
+    html,body { height:100%; }
+    body {
+      margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial;
+      color: var(--text);
+      transition: color var(--t), background-color var(--t);
+      background: transparent; /* 背景由下方 .bg 层负责 */
+    }
+
+    /* 背景层：两层交叉淡入，做到平滑过渡与上下（Top→Bottom）线性渐变 */
+    .bg { position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: 1; transition: opacity var(--t); }
+    .bg.fade { opacity: 0; }
+
+    .container{max-width:860px;margin:42px auto 96px;padding:0 20px;}
+
+    header{display:grid;grid-template-columns:76px 1fr auto;gap:18px;align-items:center;}
+    .avatar{width:76px;height:76px;border-radius:50%;overflow:hidden;background:var(--card);box-shadow:var(--shadow);display:grid;place-items:center;border:1px solid rgba(0,0,0,.06);}
+    .avatar img{width:100%;height:100%;object-fit:cover;}
+    .avatar .loading{color:var(--muted);font-size:12px;text-align:center;}
+
+    .title{margin:0;font-size:28px;font-weight:800;letter-spacing:.2px;}
+    .subtitle{margin:6px 0 0;color:var(--muted);font-size:15px;}
+
+    .toggle{display:inline-flex;align-items:center;gap:10px;border:1px solid rgba(0,0,0,.12);border-radius:999px;padding:6px 10px;background:var(--card);box-shadow:var(--shadow);transition:background var(--t), border-color var(--t);}    
+    .toggle button{all:unset;cursor:pointer;padding:6px 10px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;}
+    .toggle button.active{background:var(--accent);color:#fff;}
+    .toggle svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;}
+
+    .tagline{margin:18px 0 26px;padding:14px 18px;border-radius:14px;background:var(--card);box-shadow:var(--shadow);border:1px solid rgba(0,0,0,.06);transition:background var(--t), color var(--t), border-color var(--t);} 
+
+    /* 模块化结构样式 */
+    .module{margin-bottom:32px;}
+    .module:last-child{margin-bottom:0;}
+    
+            .group-title{font-size:16px;font-weight:600;color:var(--muted);margin:0 0 16px;letter-spacing:.2px;text-transform:uppercase;}
+        
+
+
+    .grid{display:grid;gap:12px;}
+    .section{background:var(--card);border:none;border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;transition:background var(--t), color var(--t);} 
+          .section h2{font-size:18px;margin:0 0 10px;}
+      .items{display:grid;gap:8px;}
+      .item{font-size:15px;}
+      
+      /* 右对齐样式 */
+      .item-with-right{display:flex;justify-content:space-between;align-items:center;}
+      .item-right{color:var(--muted);font-size:14px;font-weight:500;}
+      
+      /* title右对齐样式 */
+      .title-with-right{display:flex;justify-content:space-between;align-items:center;}
+      .title-right{color:var(--muted);font-size:16px;font-weight:500;}
+      
+      /* 自定义链接样式 */
+      .custom-links {
+          display: flex;
+          gap: 0;
+          justify-content: space-between;
+          margin: 24px 0 4px 0;
+          flex-wrap: nowrap;
+      }
+      
+      .custom-link {
+          color: var(--muted);
+          text-decoration: none;
+          font-size: 14px;
+          font-weight: 400;
+          transition: color var(--t);
+          opacity: 0.8;
+          flex: 1;
+          text-align: center;
+      }
+      
+      .custom-link:hover {
+          color: var(--accent);
+          opacity: 1;
+      }
+
+    footer{margin-top:28px;color:var(--muted);font-size:13px;text-align:center;}
+
+            @media (max-width:560px){
+          header{grid-template-columns:56px 1fr auto;gap:24px;}
+          .title{font-size:22px;}
+          .subtitle{margin:8px 0 0;}
+          
+                      .custom-links {
+                gap: 16px;
+            }
+            
+            .custom-link {
+                font-size: 13px;
+            }
+        }
+  </style>
+</head>
+<body>
+  <!-- 双层背景用于淡入淡出：bgA 当前，bgB 作为下一帧渐变层 -->
+  <div id="bgA" class="bg"></div>
+  <div id="bgB" class="bg fade"></div>
+
+  <div class="container">
+    <header>
+      <div class="avatar">
+        <img id="avatar" alt="avatar" />
+        <div id="avatarLoading" class="loading">加载中...</div>
+      </div>
+      <div>
+        <h1 class="title" id="siteTitle"></h1>
+        <p class="subtitle" id="siteSub"></p>
+      </div>
+      <div class="toggle" aria-label="模式切换">
+        <button id="btnDay" title="表·学业形态">
+          <!-- 黑白太阳图标（线框） -->
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        </button>
+        <button id="btnNight" title="里·二次元形态">
+          <!-- 黑白月亮图标（线框） -->
+          <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+    </header>
+
+            <!-- 自定义链接区域 -->
+        <div class="custom-links" id="customLinks">
+            <!-- 链接将通过JavaScript动态生成 -->
+        </div>
+        
+        <p class="tagline" id="tagline"></p>
+
+            <!-- 动态模块容器 -->
+        <div id="modulesContainer"></div>
+        
+
+
+    <footer><div id="footer"></div></footer>
+  </div>
+
+  <script src="./config.js"></script>
+  <script>
+    // ===== 从配置文件读取主题和内容 =====
+    const themeDay = siteConfig.themes.day;
+    const themeNight = siteConfig.themes.night;
+
+    const dataDay = {
+      ...siteConfig.dayMode,
+      footer: siteConfig.dayMode.footer.replace('2024', new Date().getFullYear())
+    };
+
+    const dataNight = {
+      ...siteConfig.nightMode,
+      footer: siteConfig.nightMode.footer.replace('2024', new Date().getFullYear())
+    };
+
+    // ===== DOM & 工具 =====
+    const $ = s => document.querySelector(s);
+    const elModulesContainer = $('#modulesContainer');
+    const elTitle = $('#siteTitle');
+    const elSub = $('#siteSub');
+    const elTag = $('#tagline');
+    const elCustomLinks = $('#customLinks');
+    const elFooter = $('#footer');
+    const elAvatar = $('#avatar');
+    const elAvatarLoading = $('#avatarLoading');
+    const btnDay = $('#btnDay');
+    const btnNight = $('#btnNight');
+    const bgA = $('#bgA');
+    const bgB = $('#bgB');
+
+    function applyThemeVars(th){
+      document.documentElement.style.setProperty('--text', th.text);
+      document.documentElement.style.setProperty('--muted', th.muted);
+      document.documentElement.style.setProperty('--card', th.card);
+      document.documentElement.style.setProperty('--accent', th.accent);
+    }
+
+    function setGradientOn(el, th){
+      el.style.background = `linear-gradient(to bottom, ${th.grad1}, ${th.grad2})`;
+    }
+
+    // 渐变 Crossfade：把下一主题放到隐藏层，淡入后交换层级
+    let activeBgIsA = true;
+    function crossfadeBackground(nextTheme){
+      const show = activeBgIsA ? bgB : bgA;
+      const hide = activeBgIsA ? bgA : bgB;
+      setGradientOn(show, nextTheme);
+      // 先确保下一层在背后
+      show.classList.add('fade'); // 保持 0，准备淡入
+      // 强制 reflow 以应用过渡
+      void show.offsetWidth;
+      // 淡入新背景
+      show.classList.remove('fade');
+      // 同时淡出旧背景
+      hide.classList.add('fade');
+      // 切换标记
+      activeBgIsA = !activeBgIsA;
+    }
+
+    function updateToggle(isDay){
+      btnDay.classList.toggle('active', isDay);
+      btnNight.classList.toggle('active', !isDay);
+    }
+    
+    // 渲染自定义链接
+    function renderCustomLinks(links) {
+        if (!links || links.length === 0) {
+            elCustomLinks.style.display = 'none';
+            return;
+        }
+        
+        elCustomLinks.style.display = 'flex';
+        elCustomLinks.innerHTML = links.map(link => {
+            const isExternal = link.url && (link.url.startsWith('http') || link.url.startsWith('//'));
+            const target = isExternal ? '_blank' : '_self';
+            const rel = isExternal ? 'rel="noopener noreferrer"' : '';
+            
+            return `<a href="${link.url || '#'}" class="custom-link" target="${target}" ${rel}>${link.text}</a>`;
+        }).join('');
+    }
+
+    function renderData(d){
+      elTitle.textContent = d.name;
+      elSub.textContent = d.nickname || '';
+      elTag.textContent = d.tagline || '';
+      
+      // 渲染自定义链接
+      renderCustomLinks(d.customLinks || []);
+      
+      elFooter.textContent = d.footer || '';
+      
+      // 调试头像显示
+      console.log('Avatar path:', d.avatar);
+      console.log('Avatar element:', elAvatar);
+      
+      if (d.avatar) { 
+        elAvatar.style.display = 'none';
+        elAvatarLoading.style.display = 'block';
+        elAvatar.src = d.avatar; 
+        console.log('Avatar src set to:', elAvatar.src);
+      } else { 
+        elAvatar.style.display = 'none';
+        elAvatarLoading.style.display = 'none';
+        console.log('Avatar hidden');
+      }
+
+      // 渲染模块化内容
+      elModulesContainer.innerHTML = '';
+      
+      if (d.modules) {
+        // 使用模块化结构（dayMode和nightMode都支持）
+        d.modules.forEach(module => {
+          const moduleDiv = document.createElement('div');
+          moduleDiv.className = 'module';
+          
+          // 添加分组标题
+          const groupTitle = document.createElement('h2');
+          groupTitle.className = 'group-title';
+          groupTitle.textContent = module.groupTitle;
+          moduleDiv.appendChild(groupTitle);
+          
+          // 渲染该模块下的所有sections
+          const sectionsGrid = document.createElement('div');
+          sectionsGrid.className = 'grid';
+          
+          module.sections.forEach(sec => {
+            const box = document.createElement('section');
+            box.className = 'section';
+            
+            const h2 = document.createElement('h2');
+            
+            // 检查title是否是对象格式（支持右对齐）
+            if (typeof sec.title === 'object' && sec.title.text) {
+              h2.className = 'title-with-right';
+              
+              // 左侧标题文本
+              const leftTitle = document.createElement('span');
+              leftTitle.textContent = sec.title.text;
+              h2.appendChild(leftTitle);
+              
+              // 右侧内容
+              if (sec.title.right) {
+                const rightTitle = document.createElement('span');
+                rightTitle.className = 'title-right';
+                rightTitle.textContent = sec.title.right;
+                h2.appendChild(rightTitle);
+              }
+            } else {
+              // 传统字符串格式
+              h2.textContent = sec.title;
+            }
+            
+            box.appendChild(h2);
+            
+            const list = document.createElement('div');
+            list.className = 'items';
+            
+            sec.items.forEach(line => {
+              const p = document.createElement('div');
+              
+              // 检查是否是对象格式（支持右对齐）
+              if (typeof line === 'object' && line.text) {
+                p.className = 'item item-with-right';
+                
+                // 左侧文本
+                const leftText = document.createElement('span');
+                leftText.textContent = line.text;
+                p.appendChild(leftText);
+                
+                // 右侧内容
+                if (line.right) {
+                  const rightText = document.createElement('span');
+                  rightText.className = 'item-right';
+                  rightText.textContent = line.right;
+                  p.appendChild(rightText);
+                }
+              } else {
+                // 传统字符串格式
+                p.className = 'item';
+                
+                // 检查是否包含超链接
+                if (line.includes('http')) {
+                  const parts = line.split('http');
+                  const text = parts[0];
+                  const url = 'http' + parts[1];
+                  
+                  if (text) {
+                    p.appendChild(document.createTextNode(text));
+                  }
+                  
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.target = '_blank';
+                  link.rel = 'noopener noreferrer';
+                  link.textContent = url;
+                  link.style.color = 'var(--accent)';
+                  link.style.textDecoration = 'underline';
+                  
+                  p.appendChild(link);
+                } else {
+                  p.textContent = line;
+                }
+              }
+              
+              list.appendChild(p);
+            });
+            
+            box.appendChild(list);
+            sectionsGrid.appendChild(box);
+          });
+          
+          moduleDiv.appendChild(sectionsGrid);
+          elModulesContainer.appendChild(moduleDiv);
+        });
+      } else if (d.sections) {
+        // 回退到传统sections结构（向后兼容）
+        const sectionsGrid = document.createElement('div');
+        sectionsGrid.className = 'grid';
+        
+        d.sections.forEach(sec => {
+          const box = document.createElement('section');
+          box.className = 'section';
+          
+          const h2 = document.createElement('h2');
+          h2.textContent = sec.title;
+          box.appendChild(h2);
+          
+          const list = document.createElement('div');
+          list.className = 'items';
+          
+          sec.items.forEach(line => {
+            const p = document.createElement('div');
+            p.className = 'item';
+            
+            // 检查是否包含超链接
+            if (line.includes('http')) {
+              const parts = line.split('http');
+              const text = parts[0];
+              const url = 'http' + parts[1];
+              
+              if (text) {
+                p.appendChild(document.createTextNode(text));
+              }
+              
+              const link = document.createElement('a');
+              link.href = url;
+              link.target = '_blank';
+              link.rel = 'noopener noreferrer';
+              link.textContent = url;
+              link.style.color = 'var(--accent)';
+              link.style.textDecoration = 'underline';
+              
+              p.appendChild(link);
+            } else {
+              p.textContent = line;
+            }
+            
+            list.appendChild(p);
+          });
+          
+          box.appendChild(list);
+          sectionsGrid.appendChild(box);
+        });
+        
+        elModulesContainer.appendChild(sectionsGrid);
+      }
+    }
+
+    const STORAGE_KEY = 'site-mode';
+    const getMode = () => localStorage.getItem(STORAGE_KEY) || 'day';
+    const setMode = (m) => localStorage.setItem(STORAGE_KEY, m);
+
+    function applyMode(mode, instant=false){
+      const isDay = mode === 'day';
+      const th = isDay ? themeDay : themeNight;
+      applyThemeVars(th);
+      if (instant){
+        // 初次渲染不做动画：把两层都设到同一渐变，避免闪烁
+        setGradientOn(bgA, th);
+        setGradientOn(bgB, th);
+        bgA.classList.remove('fade');
+        bgB.classList.add('fade');
+      } else {
+        crossfadeBackground(th);
+      }
+      renderData(isDay ? dataDay : dataNight);
+      updateToggle(isDay);
+    }
+
+    // 更新页面标题
+    document.title = siteConfig.siteInfo.title;
+    
+    // 初始化
+    applyMode(getMode(), true);
+
+    // 头像加载错误处理
+    elAvatar.addEventListener('error', function() {
+      console.error('Avatar image failed to load:', this.src);
+      this.style.display = 'none';
+      elAvatarLoading.textContent = '加载失败';
+    });
+    
+    elAvatar.addEventListener('load', function() {
+      console.log('Avatar image loaded successfully:', this.src);
+      this.style.display = 'block';
+      elAvatarLoading.style.display = 'none';
+    });
+    
+    // 绑定事件
+    btnDay.addEventListener('click', ()=>{ setMode('day'); applyMode('day'); });
+    btnNight.addEventListener('click', ()=>{ setMode('night'); applyMode('night'); });
+  </script>
+</body>
+</html>
